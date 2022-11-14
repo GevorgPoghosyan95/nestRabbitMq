@@ -1,0 +1,65 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:13-alpine
+    container_name: ns-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+      POSTGRES_MULTIPLE_DATABASES: orders
+    networks:
+      - noorlogic
+    ports:
+      - "5435:5432"
+    volumes:
+      - "./docker/postgres:/docker-entrypoint-initdb.d"
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: apps/orders/Dockerfile
+      target: development
+    container_name: ns-api-gateway
+    command: npm run start:dev api-gateway
+    depends_on:
+      - rabbitmq
+      - orders
+    networks:
+      - noorlogic
+    ports:
+      - "3005:3005"
+    volumes:
+      - "./apps/api-gateway:/usr/src/app/apps/api-gateway"
+
+  orders:
+    build:
+      context: .
+      dockerfile: apps/orders/Dockerfile
+      target: development
+    command: npm run start:dev orders
+    container_name: ns-orders
+    env_file:
+      - apps/orders/src/.env
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - noorlogic
+    ports:
+      - "3001:3001"
+    volumes:
+      - "./apps/orders:/usr/src/app/apps/orders"
+
+  rabbitmq:
+    image: rabbitmq:3.8-management-alpine
+    container_name: 'rabbitmq'
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    volumes:
+      - ~/.docker-conf/rabbitmq/data/:/var/lib/rabbitmq/
+      - ~/.docker-conf/rabbitmq/log/:/var/log/rabbitmq
+    networks:
+      - noorlogic
+networks:
+  noorlogic:
